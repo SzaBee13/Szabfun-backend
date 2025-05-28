@@ -3,6 +3,7 @@ const sqlite3 = require("sqlite3").verbose();
 const bodyParser = require("body-parser");
 const crypto = require("crypto");
 const cors = require("cors"); // Import the cors package
+const path = require("path");
 
 const app = express();
 const port = 3000;
@@ -153,7 +154,53 @@ app.get("/sus-link/search", (req, res) => {
     });
 });
 
-// Start the server
-app.listen(port, () => {
-    console.log(`Server is running on http://localhost:${port}`);
+const http = require("http");
+const { Server } = require("socket.io");
+
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: { origin: "*" },
+    path: "/tic-tac-toe/socket.io"  // 👈 custom path here
+});
+
+
+// Multiplayer Tic-Tac-Toe logic
+let waitingPlayer = null;
+
+io.on("connection", (socket) => {
+    console.log(`Player connected: ${socket.id}`);
+
+    if (waitingPlayer) {
+        const room = `${waitingPlayer.id}#${socket.id}`;
+        socket.join(room);
+        waitingPlayer.join(room);
+
+        // Assign symbols
+        socket.emit("startGame", { room, symbol: "O" });
+        waitingPlayer.emit("startGame", { room, symbol: "X" });
+
+        waitingPlayer = null;
+    } else {
+        waitingPlayer = socket;
+    }
+
+    socket.on("move", ({ room, board }) => {
+        socket.to(room).emit("updateBoard", board);
+    });
+
+    socket.on("gameOver", ({ room, winner }) => {
+        // Broadcast to both players in the room
+        io.to(room).emit("gameOver", { winner });
+    });
+
+    socket.on("disconnect", () => {
+        if (waitingPlayer === socket) waitingPlayer = null;
+        console.log(`Player disconnected: ${socket.id}`);
+    });
+});
+
+
+
+server.listen(port, () => {
+    console.log(`Server with Socket.IO running at http://localhost:${port}`);
 });
