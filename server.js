@@ -184,6 +184,25 @@ io.on("connection", (socket) => {
         waitingPlayer = socket;
     }
 
+    socket.on("joinRoom", (room) => {
+        socket.join(room);
+        const clients = Array.from(io.sockets.adapter.rooms.get(room) || []);
+        if (clients.length === 1) {
+            // First player waits for opponent, no symbol assigned yet
+            socket.emit("waitingForOpponent", { room });
+        } else if (clients.length === 2) {
+            // Second player joins, assign symbols randomly
+            const symbol = Math.random() < 0.5 ? "X" : "O";
+            const [firstId, secondId] = clients;
+            // Assign symbols
+            io.to(firstId).emit("startGame", { room, symbol });
+            io.to(secondId).emit("startGame", { room, symbol: symbol === "X" ? "O" : "X" });
+        } else {
+            // Room full or error
+            socket.emit("roomFull", { room });
+        }
+    });
+
     socket.on("move", ({ room, board }) => {
         socket.to(room).emit("updateBoard", board);
     });
