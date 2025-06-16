@@ -158,7 +158,7 @@ const http = require("http");
 const { Server } = require("socket.io");
 
 const server = http.createServer(app);
-const io = new Server(server, {
+const ticTacToeIo = new Server(server, {
     cors: { origin: "*" },
     path: "/tic-tac-toe/socket.io"  // 👈 custom path here
 });
@@ -167,7 +167,7 @@ const io = new Server(server, {
 // Multiplayer Tic-Tac-Toe logic
 let waitingPlayer = null;
 
-io.on("connection", (socket) => {
+ticTacToeIo.on("connection", (socket) => {
     console.log(`Player connected: ${socket.id}`);
 
     if (waitingPlayer) {
@@ -218,8 +218,62 @@ io.on("connection", (socket) => {
     });
 });
 
+const chaosClickerIo = new Server(server, {
+    cors: { origin: "*" },
+    path: "/chaos-clicker/socket.io"
+})
 
+// Track currently active events
+const activeChaosEvents = new Set();
+// Event types
+const CHAOS_EVENTS = [
+    {
+        name: "Server Lag",
+        description: "Clicks are reversed and time cookies stop for 30 seconds!",
+        type: "lag",
+        duration: 30
+    },
+    {
+        name: "Great-Grandma",
+        description: "2x time multiplier for 60 seconds!",
+        type: "great-grandma",
+        duration: 60
+    },
+    {
+        name: "Shaking Hands",
+        description: "0.5 click multiplier for 60 seconds!",
+        type: "shaking-hands",
+        duration: 60
+    }
+];
+
+function testEvent() {
+    const event = CHAOS_EVENTS[Math.floor(Math.random() * CHAOS_EVENTS.length)];
+    chaosClickerIo.emit("chaos-event", event);
+    console.log(`[TEST] Emitted event: ${event.name}`);
+}
+
+let isEvent = false;
+
+setInterval(() => {
+    for (const event of CHAOS_EVENTS) {
+        if (!activeChaosEvents.has(event.type) && Math.random() < 0.25) {
+            chaosClickerIo.emit("chaos-event", event);
+            console.log(`Emitted event: ${event.name}`);
+            activeChaosEvents.add(event.type);
+
+            // Remove from active after duration
+            setTimeout(() => {
+                activeChaosEvents.delete(event.type);
+            }, event.duration * 1000);
+
+            break; // Only one event per interval
+        }
+    }
+}, 5 * 60 * 1000); // 5 minutes
 
 server.listen(port, () => {
     console.log(`Server with Socket.IO running at http://localhost:${port}`);
+
+    setTimeout(testEvent, 5000);
 });
