@@ -98,11 +98,10 @@ app.post("/save/:game", (req, res) => {
     const game = req.params.game;
     const google_id = req.body.google_id;
     const saveData = JSON.stringify(req.body.data); // use a different variable name!!
-    const lastSaved = Date.now();
 
     data.run(
-        `INSERT OR REPLACE INTO game_saves (google_id, game, data, lastSaved) VALUES (?, ?, ?, ?)`,
-        [google_id, game, saveData, lastSaved],
+        `INSERT OR REPLACE INTO game_saves (google_id, game, data) VALUES (?, ?, ?, ?)`,
+        [google_id, game, saveData],
         (err) => {
             if (err) {
                 console.error("DB save error:", err.message);
@@ -125,7 +124,7 @@ app.get("/load/:game", (req, res) => {
 
     data.get(
         `
-        SELECT data, lastSaved FROM game_saves
+        SELECT data FROM game_saves
         WHERE google_id = ? AND game = ?
     `,
         [google_id, game],
@@ -138,10 +137,9 @@ app.get("/load/:game", (req, res) => {
             if (row) {
                 res.json({
                     data: JSON.parse(row.data),
-                    lastSaved: row.lastSaved,
                 });
             } else {
-                res.json({ data: null, lastSaved: null });
+                res.json({ data: null });
             }
         }
     );
