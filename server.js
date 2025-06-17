@@ -86,7 +86,6 @@ const data = new sqlite3.Database("./data.db", (err) => {
                 google_id TEXT,
                 game TEXT,
                 data TEXT,
-                lastSaved INTEGER,
                 PRIMARY KEY (google_id, game)
             );
         `);
@@ -97,11 +96,11 @@ const data = new sqlite3.Database("./data.db", (err) => {
 app.post("/save/:game", (req, res) => {
     const game = req.params.game;
     const google_id = req.body.google_id;
-    const saveData = JSON.stringify(req.body.data); // use a different variable name!!
+    const savePayload = JSON.stringify(req.body.data); // ✨ renamed from 'saveData'
 
     data.run(
         `INSERT OR REPLACE INTO game_saves (google_id, game, data) VALUES (?, ?, ?)`,
-        [google_id, game, saveData],
+        [google_id, game, savePayload],
         (err) => {
             if (err) {
                 console.error("DB save error:", err.message);
