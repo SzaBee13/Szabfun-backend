@@ -3,3 +3,5 @@
 /.env
 /.env.local
 /run-docker.md
+./data.db
+./sus-link.db
