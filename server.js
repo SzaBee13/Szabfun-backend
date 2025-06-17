@@ -100,7 +100,7 @@ app.post("/save/:game", (req, res) => {
     const saveData = JSON.stringify(req.body.data); // use a different variable name!!
 
     data.run(
-        `INSERT OR REPLACE INTO game_saves (google_id, game, data) VALUES (?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO game_saves (google_id, game, data) VALUES (?, ?, ?)`,
         [google_id, game, saveData],
         (err) => {
             if (err) {
