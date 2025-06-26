@@ -8,6 +8,23 @@ const path = require("path");
 const app = express();
 const port = 3000;
 
+const allowedOrigins = [
+    "https://szabfun.pages.dev",
+    // "http://localhost:5050",
+];
+
+const saveLoadCors = cors({
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        } else {
+            return callback(new Error("Not allowed by CORS"));
+        }
+    }
+});
+
 // Enable CORS for all origins
 app.use(cors());
 
@@ -92,8 +109,18 @@ const data = new sqlite3.Database("./data.db", (err) => {
     }
 });
 
+// Redirect "/" to szabfun.pages.dev/docs
+app.get("/", (req, res) => {
+    res.redirect("https://szabfun.pages.dev/docs");
+});
+
+// Return status for "/status"
+app.get("/status", (req, res) => {
+    res.json({ status: "ok", uptime: process.uptime() });
+});
+
 // Save game data
-app.post("/save/:game", (req, res) => {
+app.post("/save/:game", saveLoadCors, (req, res) => {
     const game = req.params.game;
     const google_id = req.body.google_id;
     const savePayload = JSON.stringify(req.body.data); // ✨ renamed from 'saveData'
@@ -113,7 +140,7 @@ app.post("/save/:game", (req, res) => {
 });
 
 // Load game data
-app.get("/load/:game", (req, res) => {
+app.get("/load/:game", saveLoadCors, (req, res) => {
     const game = req.params.game;
     const google_id = req.query.google_id;
 
