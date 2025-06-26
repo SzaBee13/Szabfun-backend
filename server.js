@@ -343,6 +343,55 @@ app.post("/admin/send-email", saveLoadCors, async (req, res) => {
   });
 });
 
+app.get("/admin/get-admins", saveLoadCors, (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res
+      .status(401)
+      .json({ error: "Missing or invalid Authorization header" });
+  }
+  const googleId = authHeader.replace("Bearer ", "");
+  getAdminIds((err, ids) => {
+    if (err) return res.status(500).json({ error: "DB error" });
+    if (!ids.includes(googleId)) {
+      return res.status(403).json({ error: "Forbidden: Not admin" });
+    }
+
+    // Get all admin IDs (including owner)
+    adminsDb.all("SELECT google_id FROM admins", [], (err, rows) => {
+      if (err) {
+        return res.status(500).json({ error: "Failed to fetch admins" });
+      }
+      let adminIds = rows.map((r) => r.google_id);
+      if (!adminIds.includes(ownerId)) adminIds.push(ownerId);
+
+      // Fetch email and name for each admin from users.db
+      if (adminIds.length === 0) return res.json({ admins: [] });
+
+      users.all(
+        `SELECT id, email, name FROM users WHERE id IN (${adminIds.map(() => "?").join(",")})`,
+        adminIds,
+        (err, userRows) => {
+          // Map: id -> {email, name}
+          const userMap = {};
+          if (userRows) {
+            for (const u of userRows) {
+              userMap[u.id] = [u.email, u.name];
+            }
+          }
+          // Build result: [id, email, name] for each admin
+          const admins = adminIds.map(id => [
+            id,
+            userMap[id]?.[0] || null,
+            userMap[id]?.[1] || null
+          ]);
+          res.json({ admins });
+        }
+      );
+    });
+  });
+});
+
 app.get("/owner/is-owner", saveLoadCors, (req, res) => {
   const userId = req.query.userId;
   if (!userId) {
@@ -361,26 +410,60 @@ app.post("/owner/add-admin", saveLoadCors, (req, res) => {
       .status(401)
       .json({ error: "Missing or invalid Authorization header" });
   }
+  // Add the user by id
   const googleId = authHeader.replace("Bearer ", "");
   if (googleId !== ownerId) {
     return res.status(403).json({ error: "Forbidden: Not owner" });
   }
 
-  const { adminGoogleId } = req.body;
-  if (!adminGoogleId) {
-    return res.status(400).json({ error: "Missing adminGoogleId" });
-  }
-
-  adminsDb.run(
-    "INSERT OR IGNORE INTO admins (google_id) VALUES (?)",
-    [adminGoogleId],
-    function (err) {
-      if (err) {
-        return res.status(500).json({ error: "Failed to add admin" });
-      }
-      res.json({ success: true, adminGoogleId });
+  const type = req.query.type || "id";
+  if (type == "id") {
+    const { adminGoogleId } = req.body;
+    if (!adminGoogleId) {
+      return res.status(400).json({ error: "Missing adminGoogleId" });
     }
-  );
+  
+    adminsDb.run(
+      "INSERT OR IGNORE INTO admins (google_id) VALUES (?)",
+      [adminGoogleId],
+      function (err) {
+        if (err) {
+          return res.status(500).json({ error: "Failed to add admin" });
+        }
+        res.json({ success: true, adminGoogleId });
+      }
+    );
+  } else if (type == "email") {
+    // Add the user by email
+    const { adminEmail } = req.body;
+    if (!adminEmail) {
+      return res.status(400).json({ error: "Missing adminEmail" });
+    }
+
+    users.get(
+      "SELECT id FROM users WHERE email = ?",
+      [adminEmail],
+      (err, row) => {
+        if (err) {
+          return res.status(500).json({ error: "Failed to fetch user" });
+        }
+        if (!row) {
+          return res.status(404).json({ error: "User not found" });
+        }
+        const adminGoogleId = row.id;
+        adminsDb.run(
+          "INSERT OR IGNORE INTO admins (google_id) VALUES (?)",
+          [adminGoogleId],
+          function (err) {
+            if (err) {
+              return res.status(500).json({ error: "Failed to add admin" });
+            }
+            res.json({ success: true, adminGoogleId });
+          }
+        );
+      }
+    );
+  }
 });
 
 app.post("/owner/remove-admin", saveLoadCors, (req, res) => {
