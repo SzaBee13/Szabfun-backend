@@ -55,8 +55,6 @@ async function sendMail(to, subject, message) {
   });
 }
 
-sendMail("miabajodlol@gmail.com", "Test Email", "<h1>Hello from Szabfun!</h1>");
-
 const saveLoadCors = cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl)
