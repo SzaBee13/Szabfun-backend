@@ -4,13 +4,13 @@ dotenv.config();
 
 const ownerId = process.env.OWNER;
 
-const { admins } = require("./admin.js")
-
 function isOwner(id, callback) {
   callback(null, id === ownerId);
 }
 
 function addAdmin(type, body, callback) {
+  const { admins } = require("./admin.js")
+
   if (type === "id") {
     const { adminGoogleId } = body;
     if (!adminGoogleId) {
@@ -61,6 +61,8 @@ function addAdmin(type, body, callback) {
 }
 
 function removeAdmin(adminGoogleId, callback) {
+  const { admins } = require("./admin.js")
+
   if (!adminGoogleId) {
     return callback({ status: 400, message: "Missing adminGoogleId" });
   }
