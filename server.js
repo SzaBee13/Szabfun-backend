@@ -21,7 +21,7 @@ const REDIRECT_URI = process.env.REDIRECT_URI;
 const REFRESH_TOKEN = process.env.REFRESH_TOKEN;
 
 // Admins
-const ownerId = "116064392884345426976";
+const ownerId = process.env.OWNER;
 
 const oAuth2Client = new google.auth.OAuth2(
   CLIENT_ID,
