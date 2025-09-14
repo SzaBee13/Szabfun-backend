@@ -248,6 +248,7 @@ const ticTacToeIo = new Server(server, {
 
 // Multiplayer Tic-Tac-Toe logic
 let waitingPlayer = null;
+let boards = {};
 
 ticTacToeIo.on("connection", (socket) => {
   console.log(`Player connected: ${socket.id}`);
