@@ -13,8 +13,12 @@ const port = 3000;
 const { saveGameData, loadGameData } = require("./game-save.js");
 const { register } = require("./users.js");
 const { isAdmin, sendMailAdmin, getAdmins } = require("./admin.js");
-const { ownerId, isOwner, addAdmin, removeAdmin } = require("./owner.js")
-const { createCustomLink, getCustomLinks, searchLink } = require("./sus-link.js");
+const { ownerId, isOwner, addAdmin, removeAdmin } = require("./owner.js");
+const {
+  createCustomLink,
+  getCustomLinks,
+  searchLink,
+} = require("./sus-link.js");
 const { createBoard, isValidMove, checkWinner } = require("./tic-tac-toe.js");
 const { setupChaosClicker } = require("./chaos-clicker.js");
 
@@ -150,7 +154,7 @@ app.get("/owner/is-owner", saveLoadCors, (req, res) => {
   }
 
   isOwner(userId, (err, result) => {
-    res.json({ isOwner: result ? true : false })
+    res.json({ isOwner: result ? true : false });
   });
 });
 
@@ -179,7 +183,9 @@ app.post("/owner/add-admin", saveLoadCors, (req, res) => {
 app.post("/owner/remove-admin", saveLoadCors, (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Missing or invalid Authorization header" });
+    return res
+      .status(401)
+      .json({ error: "Missing or invalid Authorization header" });
   }
   const googleId = authHeader.replace("Bearer ", "");
 
@@ -201,7 +207,9 @@ app.post("/owner/remove-admin", saveLoadCors, (req, res) => {
 app.post("/sus-link/create-custom-link", (req, res) => {
   const { name, endpoint, author } = req.body;
   if (!name || !endpoint || !author) {
-    return res.status(400).json({ error: "Name, endpoint, and author are required." });
+    return res
+      .status(400)
+      .json({ error: "Name, endpoint, and author are required." });
   }
   createCustomLink({ name, endpoint, author }, (err, result) => {
     if (err) {
@@ -215,7 +223,9 @@ app.post("/sus-link/create-custom-link", (req, res) => {
 app.get("/sus-link/get-custom", (req, res) => {
   getCustomLinks((err, links) => {
     if (err) {
-      return res.status(500).json({ error: "Failed to retrieve custom links." });
+      return res
+        .status(500)
+        .json({ error: "Failed to retrieve custom links." });
     }
     res.json(links);
   });
@@ -249,6 +259,7 @@ const ticTacToeIo = new Server(server, {
 // Multiplayer Tic-Tac-Toe logic
 let waitingPlayer = null;
 let boards = {};
+let playAgainRequests = {};
 
 ticTacToeIo.on("connection", (socket) => {
   console.log(`Player connected: ${socket.id}`);
@@ -269,7 +280,9 @@ ticTacToeIo.on("connection", (socket) => {
 
   socket.on("joinRoom", (room) => {
     socket.join(room);
-    const clients = Array.from(ticTacToeIo.sockets.adapter.rooms.get(room) || []);
+    const clients = Array.from(
+      ticTacToeIo.sockets.adapter.rooms.get(room) || []
+    );
     if (clients.length === 1) {
       socket.emit("waitingForOpponent", { room });
     } else if (clients.length === 2) {
@@ -285,18 +298,46 @@ ticTacToeIo.on("connection", (socket) => {
     }
   });
 
-  socket.on("move", ({ room, row, col, symbol }) => {
-    if (!boards[room]) boards[room] = createBoard();
-    if (isValidMove(boards[room], row, col)) {
-      boards[room][row][col] = symbol;
-      const winner = checkWinner(boards[room]);
-      ticTacToeIo.to(room).emit("updateBoard", boards[room]);
+  socket.on("move", ({ room, board }) => {
+    /*
+    [ '1col 1row', '2col 1row', '3col 1row', '1col 2row', '2col 2row', '3col 2row', '1col 3row', '2col 3row', '3col 3row' ]
+    */
+    // index: 0-8 --> calc from board and last board
+    const lastBoard = boards[room] || Array(9).fill("");
+    const index = board.findIndex((cell, i) => cell !== lastBoard[i]);
+    if (index === -1) {
+      return socket.emit("invalidMove", { room });
+    } else if (!isValidMove(lastBoard, index, board[index])) {
+      return socket.emit("invalidMove", { room });
+    } else {
+      boards[room] = board;
+      ticTacToeIo.to(room).emit("updateBoard", { board });
+      const winner = checkWinner(board);
       if (winner) {
         ticTacToeIo.to(room).emit("gameOver", { winner });
         delete boards[room];
       }
-    } else {
-      socket.emit("invalidMove");
+    }
+  });
+
+  socket.on("playAgain", ({ room }) => {
+    if (!playAgainRequests[room]) playAgainRequests[room] = new Set();
+    playAgainRequests[room].add(socket.id);
+
+    // Notify all in room how many have requested
+    const count = playAgainRequests[room].size;
+    ticTacToeIo.to(room).emit("playAgainRequested", { count });
+
+    // If both players requested, reset game
+    const clients = Array.from(
+      ticTacToeIo.sockets.adapter.rooms.get(room) || []
+    );
+    if (count === 2 && clients.length === 2) {
+      const newBoard = createBoard();
+      boards[room] = newBoard;
+      ticTacToeIo.to(room).emit("playAgain");
+      ticTacToeIo.to(room).emit("updateBoard", { board: newBoard });
+      playAgainRequests[room] = new Set(); // reset for next round
     }
   });
 

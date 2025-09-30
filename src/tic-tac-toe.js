@@ -1,19 +1,19 @@
 function createBoard() {
-  return [
-    ["", "", ""],
-    ["", "", ""],
-    ["", "", ""],
-  ];
+  return ["", "", "", "", "", "", "", "", ""];
 }
 
-function isValidMove(board, row, col) {
-  return (
-    row >= 0 &&
-    row < 3 &&
-    col >= 0 &&
-    col < 3 &&
-    board[row][col] === ""
-  );
+function isValidMove(board, index, symbol) {
+  // board is a flat array of 9 cells
+  if (index < 0 || index > 8) return false;
+  if (board[index] !== "") return false; // cell already occupied
+
+  const xCount = board.filter(c => c === "X").length;
+  const oCount = board.filter(c => c === "O").length;
+
+  if (symbol === "X" && xCount > oCount) return false;
+  if (symbol === "O" && oCount >= xCount) return false;
+
+  return true;
 }
 
 function checkWinner(board) {
