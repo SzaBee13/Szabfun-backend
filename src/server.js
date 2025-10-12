@@ -29,16 +29,20 @@ const allowedOrigins = [
 
 const saveLoadCors = (req, res, next) => {
   const origin = req.headers.origin;
+
   if (!origin || allowedOrigins.includes(origin)) {
     res.header("Access-Control-Allow-Origin", origin || "*");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+    res.header(
+      "Access-Control-Allow-Headers",
+      "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+    );
     res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-    next();
-  } else {
-    // Still send a header, maybe block via JSON instead
-    res.header("Access-Control-Allow-Origin", "null"); // can't send original origin
-    res.status(403).json({ error: "Origin not allowed" });
+    return next();
   }
+
+  // For disallowed origins, you can still send a header or block
+  res.header("Access-Control-Allow-Origin", "null"); // browser sees it
+  res.status(403).json({ error: "Origin not allowed" });
 };
 
 // Enable CORS for all origins
