@@ -27,17 +27,19 @@ const allowedOrigins = [
   // "http://localhost:5500"
 ];
 
-const saveLoadCors = cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    } else {
-      return callback(new Error("Not allowed by CORS"));
-    }
-  },
-});
+const saveLoadCors = (req, res, next) => {
+  const origin = req.headers.origin;
+  if (!origin || allowedOrigins.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin || "*");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+    res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+    next();
+  } else {
+    // Still send a header, maybe block via JSON instead
+    res.header("Access-Control-Allow-Origin", "null"); // can't send original origin
+    res.status(403).json({ error: "Origin not allowed" });
+  }
+};
 
 // Enable CORS for all origins
 app.use(cors());
@@ -105,9 +107,8 @@ app.post("/register", saveLoadCors, (req, res) => {
 // --- Update admin check to use DB ---
 app.get("/admin/is-admin", saveLoadCors, (req, res) => {
   const userId = req.query.userId;
-  if (!userId) {
-    return res.status(400).json({ error: "Missing userId" });
-  }
+  if (!userId) return res.status(400).json({ error: "Missing userId" });
+
   isAdmin(userId, (err, isAdminResult) => {
     if (err) return res.status(500).json({ error: "DB error" });
     res.json({ isAdmin: isAdminResult });
