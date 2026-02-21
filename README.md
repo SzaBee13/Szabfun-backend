@@ -74,7 +74,7 @@ backend/
 
 ## API Endpoints & Features
 
-See the <a href="https://szabfun.pages.dev.">docs</a> for Endpoints and Features
+See the <a href="https://fun.szabee.me.">docs</a> for Endpoints and Features
 
 ---
 

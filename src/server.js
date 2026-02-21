@@ -23,7 +23,7 @@ const { createBoard, isValidMove, checkWinner } = require("./tic-tac-toe.js");
 const { setupChaosClicker } = require("./chaos-clicker.js");
 
 const allowedOrigins = [
-  "https://szabfun.pages.dev",
+  "https://fun.szabee.me",
   // "http://localhost:5500"
 ];
 
@@ -51,9 +51,9 @@ app.use(cors());
 // Middleware
 app.use(bodyParser.json());
 
-// Redirect "/" to szabfun.pages.dev/docs
+// Redirect "/" to fun.szabee.me/docs
 app.get("/", (req, res) => {
-  res.redirect("https://szabfun.pages.dev/docs");
+  res.redirect("https://fun.szabee.me/docs");
 });
 
 // Return status for "/status"
