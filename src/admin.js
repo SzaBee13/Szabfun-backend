@@ -13,6 +13,16 @@ const admins = new sqlite3.Database(dbPath, (err) => {
                 email TEXT NOT NULL
             );
         `);
+    admins.run(`
+            CREATE TABLE IF NOT EXISTS suggestions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                game TEXT NOT NULL,
+                message TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            );
+        `);
   }
 });
 
@@ -51,7 +61,7 @@ function sendMailAdmin(id, body, callback) {
       }
       try {
         for (const user of rows) {
-          await sendMail(user.email, subject, message);
+          await sendMail(user.email, subject, message, "admin");
         }
         callback(null); // Success
       } catch (err) {
@@ -107,9 +117,47 @@ function getAdmins(id, callback) {
   });
 }
 
+function saveSuggestion(userId, game, message, callback) {
+  admins.run(
+    `INSERT INTO suggestions (user_id, game, message) VALUES (?, ?, ?)`,
+    [userId, game, message],
+    function(err) {
+      if (err) {
+        return callback({ status: 500, message: "Failed to save suggestion" });
+      }
+      callback(null, { id: this.lastID });
+    }
+  );
+}
+
+function getSuggestions(userId, callback) {
+  getAdminIds((err, adminIds) => {
+    if (err) return callback({ status: 500, message: "DB error" });
+    if (!adminIds.includes(userId)) {
+      return callback({ status: 403, message: "Forbidden: Not admin" });
+    }
+
+    admins.all(
+      `SELECT s.id, s.user_id, s.game, s.message, s.created_at, u.name, u.email 
+       FROM suggestions s 
+       LEFT JOIN users u ON s.user_id = u.id 
+       ORDER BY s.created_at DESC`,
+      [],
+      (err, rows) => {
+        if (err) {
+          return callback({ status: 500, message: "Failed to fetch suggestions" });
+        }
+        callback(null, rows || []);
+      }
+    );
+  });
+}
+
 module.exports = {
   isAdmin,
   sendMailAdmin,
   getAdmins,
+  saveSuggestion,
+  getSuggestions,
   admins,
 };

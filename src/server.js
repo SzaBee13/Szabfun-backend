@@ -12,7 +12,7 @@ const port = 3000;
 
 const { saveGameData, loadGameData } = require("./game-save.js");
 const { register } = require("./users.js");
-const { isAdmin, sendMailAdmin, getAdmins } = require("./admin.js");
+const { isAdmin, sendMailAdmin, getAdmins, saveSuggestion, getSuggestions } = require("./admin.js");
 const { ownerId, isOwner, addAdmin, removeAdmin } = require("./owner.js");
 const {
   createCustomLink,
@@ -62,7 +62,7 @@ app.get("/status", (req, res) => {
 });
 
 // Save game data endpoint
-app.post("/save/:game", (req, res) => {
+app.post("/save/:game", saveLoadCors, (req, res) => {
   const game = req.params.game;
   const google_id = req.body.google_id;
   const savePayload = JSON.stringify(req.body.data);
@@ -76,7 +76,7 @@ app.post("/save/:game", (req, res) => {
 });
 
 // Load game data endpoint
-app.get("/load/:game", (req, res) => {
+app.get("/load/:game", saveLoadCors, (req, res) => {
   const game = req.params.game;
   const google_id = req.query.google_id;
 
@@ -205,6 +205,47 @@ app.post("/owner/remove-admin", saveLoadCors, (req, res) => {
       return res.status(err.status || 500).json({ error: err.message });
     }
     res.json(result);
+  });
+});
+
+// POST /suggestions/create - Save a new suggestion
+app.post("/suggestions/create", saveLoadCors, (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res
+      .status(401)
+      .json({ error: "Missing or invalid Authorization header" });
+  }
+  const userId = authHeader.replace("Bearer ", "");
+  const { game, message } = req.body;
+
+  if (!game || !message) {
+    return res.status(400).json({ error: "Game and message are required" });
+  }
+
+  saveSuggestion(userId, game, message, (err, result) => {
+    if (err) {
+      return res.status(err.status).json({ error: err.message });
+    }
+    res.json({ success: true, id: result.id });
+  });
+});
+
+// GET /suggestions/get-all - Get all suggestions (admin only)
+app.get("/suggestions/get-all", saveLoadCors, (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res
+      .status(401)
+      .json({ error: "Missing or invalid Authorization header" });
+  }
+  const userId = authHeader.replace("Bearer ", "");
+
+  getSuggestions(userId, (err, suggestions) => {
+    if (err) {
+      return res.status(err.status).json({ error: err.message });
+    }
+    res.json({ suggestions });
   });
 });
 
