@@ -1,0 +1,17 @@
+services:
+  backend:
+    build: .
+    container_name: szabfun-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./.env
+    volumes:
+      - ./dbs:/app/dbs
+    networks:
+      - szabfun-network
+
+networks:
+  szabfun-network:
+    driver: bridge
