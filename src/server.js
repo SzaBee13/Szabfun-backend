@@ -12,10 +12,17 @@ const port = 3000;
 
 const { saveGameData, loadGameData } = require("./game-save.js");
 const { register } = require("./users.js");
-const { isAdmin, sendMailAdmin, getAdmins, saveSuggestion, getSuggestions } = require("./admin.js");
+const {
+  isAdmin,
+  sendMailAdmin,
+  getAdmins,
+  saveSuggestion,
+  getSuggestions,
+} = require("./admin.js");
 const { ownerId, isOwner, addAdmin, removeAdmin } = require("./owner.js");
 const {
   createCustomLink,
+  createPrivateShortLink,
   getCustomLinks,
   searchLink,
 } = require("./sus-link.js");
@@ -23,7 +30,7 @@ const { createBoard, isValidMove, checkWinner } = require("./tic-tac-toe.js");
 const { setupChaosClicker } = require("./chaos-clicker.js");
 
 const allowedOrigins = [
-  "https://fun.szabee.me",
+  "https://fun.szabee.me", 
   // "http://localhost:5500"
 ];
 
@@ -34,7 +41,7 @@ const saveLoadCors = (req, res, next) => {
     res.header("Access-Control-Allow-Origin", origin || "*");
     res.header(
       "Access-Control-Allow-Headers",
-      "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+      "Origin, X-Requested-With, Content-Type, Accept, Authorization",
     );
     res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
     return next();
@@ -265,6 +272,24 @@ app.post("/sus-link/create-custom-link", (req, res) => {
   });
 });
 
+// POST /sus-link/create-random-short
+app.post("/sus-link/create-random-short", (req, res) => {
+  const { endpoint } = req.body;
+
+  if (!endpoint) {
+    return res.status(400).json({ error: "Endpoint is required." });
+  }
+
+  createPrivateShortLink({ endpoint }, (err, result) => {
+    if (err) {
+      return res
+        .status(500)
+        .json({ error: "Failed to create random short link." });
+    }
+    res.json({ randomShortVersion: result.randomShortVersion });
+  });
+});
+
 // GET /sus-link/get-custom
 app.get("/sus-link/get-custom", (req, res) => {
   getCustomLinks((err, links) => {
@@ -327,7 +352,7 @@ ticTacToeIo.on("connection", (socket) => {
   socket.on("joinRoom", (room) => {
     socket.join(room);
     const clients = Array.from(
-      ticTacToeIo.sockets.adapter.rooms.get(room) || []
+      ticTacToeIo.sockets.adapter.rooms.get(room) || [],
     );
     if (clients.length === 1) {
       socket.emit("waitingForOpponent", { room });
@@ -376,7 +401,7 @@ ticTacToeIo.on("connection", (socket) => {
 
     // If both players requested, reset game
     const clients = Array.from(
-      ticTacToeIo.sockets.adapter.rooms.get(room) || []
+      ticTacToeIo.sockets.adapter.rooms.get(room) || [],
     );
     if (count === 2 && clients.length === 2) {
       const newBoard = createBoard();

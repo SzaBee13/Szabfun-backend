@@ -1,5 +1,8 @@
 const sqlite3 = require("sqlite3").verbose();
 const dbPath = "./dbs/sus-link.db";
+const crypto = require("crypto");
+
+const PRIVATE_GENERATED_AUTHOR = "__private_generated__";
 
 const susLinkDb = new sqlite3.Database(dbPath, (err) => {
   if (err) {
@@ -18,19 +21,24 @@ const susLinkDb = new sqlite3.Database(dbPath, (err) => {
   }
 });
 
-function createCustomLink({ name, endpoint, author }, callback) {
-  const crypto = require("crypto");
+function insertLinkWithRetry({ name, endpoint, author }, callback, attemptsLeft = 5) {
   const randomName = crypto.randomBytes(4).toString("hex");
-  const url = endpoint;
 
   susLinkDb.run(
     "INSERT INTO links (randomName, url, name, author) VALUES (?, ?, ?, ?)",
-    [randomName, url, name, author],
+    [randomName, endpoint, name, author],
     function (err) {
-      if (err) return callback(err);
+      if (err) {
+        // Retry on random short-code collision.
+        if (err.message && err.message.includes("UNIQUE constraint failed") && attemptsLeft > 1) {
+          return insertLinkWithRetry({ name, endpoint, author }, callback, attemptsLeft - 1);
+        }
+        return callback(err);
+      }
+
       callback(null, {
         name,
-        endpoint: url,
+        endpoint,
         author,
         randomShortVersion: randomName,
       });
@@ -38,10 +46,25 @@ function createCustomLink({ name, endpoint, author }, callback) {
   );
 }
 
+function createCustomLink({ name, endpoint, author }, callback) {
+  insertLinkWithRetry({ name, endpoint, author }, callback);
+}
+
+function createPrivateShortLink({ endpoint }, callback) {
+  insertLinkWithRetry(
+    {
+      name: "Generated private short link",
+      endpoint,
+      author: PRIVATE_GENERATED_AUTHOR,
+    },
+    callback
+  );
+}
+
 function getCustomLinks(callback) {
   susLinkDb.all(
-    "SELECT randomName, url, name, author FROM links",
-    [],
+    "SELECT randomName, url, name, author FROM links WHERE author != ?",
+    [PRIVATE_GENERATED_AUTHOR],
     (err, rows) => {
       if (err) return callback(err);
       const customLinks = rows.map((row) => ({
@@ -69,6 +92,7 @@ function searchLink(randomName, callback) {
 module.exports = {
   susLinkDb,
   createCustomLink,
+  createPrivateShortLink,
   getCustomLinks,
   searchLink,
 };
