@@ -1,11 +1,17 @@
 const sqlite3 = require("sqlite3").verbose();
-const dbPath = "./dbs/admins.db";
+const path = require("path");
+const fs = require("fs");
 
-const admins = new sqlite3.Database(dbPath, (err) => {
+const dbsDir = path.join(__dirname, "..", "dbs");
+if (!fs.existsSync(dbsDir)) {
+  fs.mkdirSync(dbsDir, { recursive: true });
+}
+
+const admins = new sqlite3.Database(path.join(dbsDir, "admins.db"), (err) => {
   if (err) {
     console.error("Error opening admins database:", err.message);
   } else {
-    console.log("Connected to SQLite database. (users)");
+    console.log("Connected to SQLite database. (admins)");
     admins.run(`
             CREATE TABLE IF NOT EXISTS users (
                 id TEXT PRIMARY KEY,
@@ -30,14 +36,29 @@ const { users } = require("./users.js");
 const { sendMail } = require("./email.js");
 const { ownerId } = require("./owner.js");
 
+const ADMIN_CACHE_TTL = 60_000;
+let adminIdsCache = null;
+let adminIdsCacheTime = 0;
+
 function getAdminIds(callback) {
+  const now = Date.now();
+  if (adminIdsCache && now - adminIdsCacheTime < ADMIN_CACHE_TTL) {
+    return callback(null, [...adminIdsCache]);
+  }
+
   admins.all("SELECT google_id FROM admins", [], (err, rows) => {
     if (err) return callback(err, []);
     const ids = rows.map((r) => r.google_id);
-    // Always include ownerId as admin
     if (!ids.includes(ownerId)) ids.push(ownerId);
-    callback(null, ids);
+    adminIdsCache = ids;
+    adminIdsCacheTime = now;
+    callback(null, [...ids]);
   });
+}
+
+function invalidateAdminCache() {
+  adminIdsCache = null;
+  adminIdsCacheTime = 0;
 }
 
 function isAdmin(id, callback) {
@@ -47,7 +68,9 @@ function isAdmin(id, callback) {
   });
 }
 
-function sendMailAdmin(id, body, callback) {
+const EMAIL_BATCH_SIZE = 20;
+
+async function sendMailAdmin(id, body, callback) {
   getAdminIds(async (err, ids) => {
     if (err) return callback({ status: 500, message: "DB error" });
     if (!ids.includes(id)) {
@@ -60,10 +83,13 @@ function sendMailAdmin(id, body, callback) {
         return callback({ status: 500, message: "Failed to fetch users" });
       }
       try {
-        for (const user of rows) {
-          await sendMail(user.email, subject, message, "admin");
+        for (let i = 0; i < rows.length; i += EMAIL_BATCH_SIZE) {
+          const batch = rows.slice(i, i + EMAIL_BATCH_SIZE);
+          await Promise.allSettled(
+            batch.map((user) => sendMail(user.email, subject, message, "admin")),
+          );
         }
-        callback(null); // Success
+        callback(null);
       } catch (err) {
         callback({ status: 500, message: err.toString() });
       }
@@ -160,4 +186,5 @@ module.exports = {
   saveSuggestion,
   getSuggestions,
   admins,
+  invalidateAdminCache,
 };

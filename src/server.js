@@ -1,5 +1,4 @@
 const express = require("express");
-const bodyParser = require("body-parser");
 const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -31,7 +30,7 @@ const { setupChaosClicker } = require("./chaos-clicker.js");
 const { setupChat } = require("./chat.js");
 
 const allowedOrigins = [
-  "https://fun.szabee.me", 
+  "https://fun.szabee.me",
   // "http://localhost:5500"
 ];
 
@@ -39,7 +38,7 @@ const saveLoadCors = (req, res, next) => {
   const origin = req.headers.origin;
 
   if (!origin || allowedOrigins.includes(origin)) {
-    res.header("Access-Control-Allow-Origin", origin || "*");
+    res.header("Access-Control-Allow-Origin", origin || allowedOrigins[0]);
     res.header(
       "Access-Control-Allow-Headers",
       "Origin, X-Requested-With, Content-Type, Accept, Authorization",
@@ -48,23 +47,16 @@ const saveLoadCors = (req, res, next) => {
     return next();
   }
 
-  // For disallowed origins, you can still send a header or block
-  res.header("Access-Control-Allow-Origin", "null"); // browser sees it
   res.status(403).json({ error: "Origin not allowed" });
 };
 
-// Enable CORS for all origins
-app.use(cors());
+app.use(cors({ origin: allowedOrigins }));
+app.use(express.json({ limit: "1mb" }));
 
-// Middleware
-app.use(bodyParser.json());
-
-// Redirect "/" to fun.szabee.me/docs
 app.get("/", (req, res) => {
   res.redirect("https://fun.szabee.me/docs");
 });
 
-// Return status for "/status"
 app.get("/status", (req, res) => {
   res.json({ status: "ok", uptime: process.uptime() });
 });
@@ -105,18 +97,15 @@ app.post("/register", saveLoadCors, (req, res) => {
 
   register(id, name, email, (err) => {
     if (err) {
-      // Handle duplicate user error (constraint violation)
       if (err.message && err.message.includes("UNIQUE constraint failed")) {
         return res.status(409).json({ error: "User already registered." });
       }
-      // Handle email sending error or other errors
       return res.status(500).json({ error: "Failed to register user." });
     }
     res.json({ message: "Registration successful." });
   });
 });
 
-// --- Update admin check to use DB ---
 app.get("/admin/is-admin", saveLoadCors, (req, res) => {
   const userId = req.query.userId;
   if (!userId) return res.status(400).json({ error: "Missing userId" });
@@ -127,7 +116,6 @@ app.get("/admin/is-admin", saveLoadCors, (req, res) => {
   });
 });
 
-// --- Update /admin/send-email to use DB ---
 app.post("/admin/send-email", saveLoadCors, async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -178,7 +166,6 @@ app.post("/owner/add-admin", saveLoadCors, (req, res) => {
       .status(401)
       .json({ error: "Missing or invalid Authorization header" });
   }
-  // Add the user by id
   const googleId = authHeader.replace("Bearer ", "");
   if (googleId !== ownerId) {
     return res.status(403).json({ error: "Forbidden: Not owner" });
@@ -202,7 +189,6 @@ app.post("/owner/remove-admin", saveLoadCors, (req, res) => {
   }
   const googleId = authHeader.replace("Bearer ", "");
 
-  // Check if the user is the owner
   if (googleId !== ownerId) {
     return res.status(403).json({ error: "Forbidden: Not owner" });
   }
@@ -216,7 +202,7 @@ app.post("/owner/remove-admin", saveLoadCors, (req, res) => {
   });
 });
 
-// POST /suggestions/create - Save a new suggestion
+// POST /suggestions/create
 app.post("/suggestions/create", saveLoadCors, (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -239,7 +225,7 @@ app.post("/suggestions/create", saveLoadCors, (req, res) => {
   });
 });
 
-// GET /suggestions/get-all - Get all suggestions (admin only)
+// GET /suggestions/get-all
 app.get("/suggestions/get-all", saveLoadCors, (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -324,14 +310,14 @@ app.get("/sus-link/search", (req, res) => {
 // Tic Tac Toe
 const server = http.createServer(app);
 const ticTacToeIo = new Server(server, {
-  cors: { origin: "*" },
+  cors: { origin: allowedOrigins },
   path: "/tic-tac-toe/socket.io",
 });
 
-// Multiplayer Tic-Tac-Toe logic
 let waitingPlayer = null;
-let boards = {};
-let playAgainRequests = {};
+const boards = {};
+const playAgainRequests = {};
+const playerRooms = new Map();
 
 ticTacToeIo.on("connection", (socket) => {
   console.log(`Player connected: ${socket.id}`);
@@ -341,10 +327,11 @@ ticTacToeIo.on("connection", (socket) => {
     socket.join(room);
     waitingPlayer.join(room);
 
-    // Assign symbols
     socket.emit("startGame", { room, symbol: "O" });
     waitingPlayer.emit("startGame", { room, symbol: "X" });
 
+    playerRooms.set(waitingPlayer.id, room);
+    playerRooms.set(socket.id, room);
     waitingPlayer = null;
   } else {
     waitingPlayer = socket;
@@ -371,10 +358,6 @@ ticTacToeIo.on("connection", (socket) => {
   });
 
   socket.on("move", ({ room, board }) => {
-    /*
-    [ '1col 1row', '2col 1row', '3col 1row', '1col 2row', '2col 2row', '3col 2row', '1col 3row', '2col 3row', '3col 3row' ]
-    */
-    // index: 0-8 --> calc from board and last board
     const lastBoard = boards[room] || Array(9).fill("");
     const index = board.findIndex((cell, i) => cell !== lastBoard[i]);
     if (index === -1) {
@@ -387,7 +370,7 @@ ticTacToeIo.on("connection", (socket) => {
       const winner = checkWinner(board);
       if (winner) {
         ticTacToeIo.to(room).emit("gameOver", { winner });
-        delete boards[room];
+        cleanupRoom(room);
       }
     }
   });
@@ -396,11 +379,9 @@ ticTacToeIo.on("connection", (socket) => {
     if (!playAgainRequests[room]) playAgainRequests[room] = new Set();
     playAgainRequests[room].add(socket.id);
 
-    // Notify all in room how many have requested
     const count = playAgainRequests[room].size;
     ticTacToeIo.to(room).emit("playAgainRequested", { count });
 
-    // If both players requested, reset game
     const clients = Array.from(
       ticTacToeIo.sockets.adapter.rooms.get(room) || [],
     );
@@ -409,19 +390,40 @@ ticTacToeIo.on("connection", (socket) => {
       boards[room] = newBoard;
       ticTacToeIo.to(room).emit("playAgain");
       ticTacToeIo.to(room).emit("updateBoard", { board: newBoard });
-      playAgainRequests[room] = new Set(); // reset for next round
+      playAgainRequests[room] = new Set();
     }
   });
 
   socket.on("gameOver", ({ room, winner }) => {
     ticTacToeIo.to(room).emit("gameOver", { winner });
+    cleanupRoom(room);
   });
 
   socket.on("disconnect", () => {
     if (waitingPlayer === socket) waitingPlayer = null;
+
+    const room = playerRooms.get(socket.id);
+    if (room) {
+      ticTacToeIo.to(room).emit("gameOver", { winner: "disconnect" });
+      cleanupRoom(room);
+      playerRooms.delete(socket.id);
+    }
+
     console.log(`Player disconnected: ${socket.id}`);
   });
 });
+
+function cleanupRoom(room) {
+  delete boards[room];
+  delete playAgainRequests[room];
+
+  const clients = Array.from(
+    ticTacToeIo.sockets.adapter.rooms.get(room) || [],
+  );
+  for (const clientId of clients) {
+    playerRooms.delete(clientId);
+  }
+}
 
 // Chaos Clicker
 setupChaosClicker(server);
@@ -429,6 +431,22 @@ setupChaosClicker(server);
 // Chat
 setupChat(server);
 
+// Graceful shutdown
+function shutdown(signal) {
+  console.log(`\n${signal} received. Shutting down gracefully...`);
+  server.close(() => {
+    console.log("HTTP server closed.");
+    process.exit(0);
+  });
+  setTimeout(() => {
+    console.error("Forced shutdown after timeout.");
+    process.exit(1);
+  }, 5000);
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+
 server.listen(port, () => {
-  console.log(`Server with Socket.IO running at http://localhost:${port}`);
+  console.log(`Server running at http://localhost:${port}`);
 });

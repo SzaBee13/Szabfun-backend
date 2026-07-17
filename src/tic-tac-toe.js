@@ -1,11 +1,16 @@
+const WINNING_COMBOS = [
+  [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
+  [0, 3, 6], [1, 4, 7], [2, 5, 8], // columns
+  [0, 4, 8], [2, 4, 6],             // diagonals
+];
+
 function createBoard() {
   return ["", "", "", "", "", "", "", "", ""];
 }
 
 function isValidMove(board, index, symbol) {
-  // board is a flat array of 9 cells
   if (index < 0 || index > 8) return false;
-  if (board[index] !== "") return false; // cell already occupied
+  if (board[index] !== "") return false;
 
   const xCount = board.filter(c => c === "X").length;
   const oCount = board.filter(c => c === "O").length;
@@ -17,42 +22,14 @@ function isValidMove(board, index, symbol) {
 }
 
 function checkWinner(board) {
-  // Rows, columns, diagonals
-  for (let i = 0; i < 3; i++) {
-    if (
-      board[i][0] &&
-      board[i][0] === board[i][1] &&
-      board[i][1] === board[i][2]
-    ) {
-      return board[i][0];
-    }
-    if (
-      board[0][i] &&
-      board[0][i] === board[1][i] &&
-      board[1][i] === board[2][i]
-    ) {
-      return board[0][i];
+  for (const [a, b, c] of WINNING_COMBOS) {
+    if (board[a] && board[a] === board[b] && board[b] === board[c]) {
+      return board[a];
     }
   }
-  if (
-    board[0][0] &&
-    board[0][0] === board[1][1] &&
-    board[1][1] === board[2][2]
-  ) {
-    return board[0][0];
-  }
-  if (
-    board[0][2] &&
-    board[0][2] === board[1][1] &&
-    board[1][1] === board[2][0]
-  ) {
-    return board[0][2];
-  }
-  // Draw
-  if (board.flat().every(cell => cell === "X" || cell === "O")) {
+  if (board.every(cell => cell === "X" || cell === "O")) {
     return "draw";
   }
-  // No winner yet
   return null;
 }
 

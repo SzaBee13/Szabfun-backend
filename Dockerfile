@@ -1,18 +1,14 @@
-# Use an official Node.js runtime as the base image
-FROM node:18
-
-# Set the working directory inside the container
+FROM node:22-alpine AS builder
 WORKDIR /app
-
-# Copy package.json and install dependencies
 COPY package*.json ./
-RUN npm install
+RUN npm ci --omit=dev
 
-# Copy the rest of your app's source code
-COPY . .
-
-# Expose the port your app runs on (e.g., 3000)
+FROM node:22-alpine
+RUN addgroup -S app && adduser -S app -G app
+WORKDIR /app
+COPY --from=builder /app/node_modules ./node_modules
+COPY src/ ./src/
+USER app
 EXPOSE 3000
-
-# Start the application
-CMD ["npm", "start"]
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://localhost:3000/status || exit 1
+CMD ["node", "src/server.js"]

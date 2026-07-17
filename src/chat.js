@@ -14,10 +14,21 @@ db.run(`CREATE TABLE IF NOT EXISTS chat_users (
     username TEXT PRIMARY KEY
 )`);
 
+const MAX_MESSAGE_LENGTH = 500;
+const MAX_NICKNAME_LENGTH = 30;
+const MAX_USERNAME_LENGTH = 30;
+
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function setupChat(server) {
   const wss = new WebSocketServer({ server, path: "/chat" });
-
-  let onlines = 0;
 
   const broadcastMessage = (username, nickname, text) => {
     const msg = JSON.stringify({ type: "message", username, nickname, text });
@@ -29,7 +40,8 @@ function setupChat(server) {
   };
 
   const broadcastOnlineCount = () => {
-    const msg = JSON.stringify({ type: "onlineCount", count: onlines });
+    const count = wss.clients.size;
+    const msg = JSON.stringify({ type: "onlineCount", count });
     wss.clients.forEach((client) => {
       if (client.readyState === 1) {
         client.send(msg);
@@ -39,7 +51,7 @@ function setupChat(server) {
 
   wss.on("connection", (socket) => {
     console.log("Chat: new connection");
-    onlines += 1;
+    broadcastOnlineCount();
 
     socket.send(
       JSON.stringify({
@@ -51,12 +63,29 @@ function setupChat(server) {
     );
 
     socket.on("message", (message) => {
-      const data = JSON.parse(message.toString());
+      let data;
+      try {
+        data = JSON.parse(message.toString());
+      } catch {
+        return;
+      }
 
       if (data.type === "register") {
+        const username = String(data.username || "").slice(0, MAX_USERNAME_LENGTH);
+        if (!username) {
+          socket.send(
+            JSON.stringify({
+              type: "register",
+              success: false,
+              message: "Username cannot be empty",
+            }),
+          );
+          return;
+        }
+
         db.get(
           "SELECT username FROM chat_users WHERE username = ?",
-          [data.username],
+          [username],
           (err, row) => {
             if (err) {
               socket.send(
@@ -79,7 +108,7 @@ function setupChat(server) {
             } else {
               db.run(
                 "INSERT INTO chat_users(username) VALUES(?)",
-                [data.username],
+                [username],
                 (err) => {
                   if (err) {
                     socket.send(
@@ -90,7 +119,7 @@ function setupChat(server) {
                       }),
                     );
                   } else {
-                    socket.username = data.username;
+                    socket.username = username;
                     socket.send(
                       JSON.stringify({
                         type: "register",
@@ -129,13 +158,20 @@ function setupChat(server) {
           return;
         }
 
-        console.log(`Chat message (${data.username}): ${data.text}`);
-        broadcastMessage(data.username, data.nickname, data.text);
+        const text = String(data.text).slice(0, MAX_MESSAGE_LENGTH);
+        const nickname = String(data.nickname).slice(0, MAX_NICKNAME_LENGTH);
+        const username = String(data.username).slice(0, MAX_USERNAME_LENGTH);
+
+        broadcastMessage(
+          escapeHtml(username),
+          escapeHtml(nickname),
+          escapeHtml(text),
+        );
       }
     });
 
     socket.on("close", () => {
-      onlines -= 1;
+      broadcastOnlineCount();
     });
   });
 

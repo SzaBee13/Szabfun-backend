@@ -1,7 +1,13 @@
 const sqlite3 = require("sqlite3").verbose();
-const dbPath = "./dbs/users.db";
+const path = require("path");
+const fs = require("fs");
 
-const users = new sqlite3.Database(dbPath, (err) => {
+const dbsDir = path.join(__dirname, "..", "dbs");
+if (!fs.existsSync(dbsDir)) {
+  fs.mkdirSync(dbsDir, { recursive: true });
+}
+
+const users = new sqlite3.Database(path.join(dbsDir, "users.db"), (err) => {
   if (err) {
     console.error("Error opening users database:", err.message);
   } else {
@@ -18,7 +24,17 @@ const users = new sqlite3.Database(dbPath, (err) => {
 
 const { sendMail } = require("./email.js")
 
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function getRegisterEmail(name) {
+  const safeName = escapeHtml(name || "there");
   return `
     <div style="font-family:'Segoe UI',Arial,sans-serif;background:#f4f4f4;padding:32px;">
       <div style="max-width:480px;margin:auto;background:#fff;border-radius:12px;box-shadow:0 2px 12px #0001;padding:32px 24px;">
@@ -26,7 +42,7 @@ function getRegisterEmail(name) {
           <img src="https://fun.szabee.me/img/logo.png" alt="Szabfun Logo" style="width:80px;margin-bottom:16px;">
           <h1 style="color:#007BFF;margin-bottom:8px;">Welcome to Szabfun!</h1>
           <p style="font-size:1.1em;color:#333;margin-bottom:24px;">
-            Hi <b>${name || "there"}</b>,<br>
+            Hi <b>${safeName}</b>,<br>
             Thanks for joining <a href="https://fun.szabee.me" style="color:#007BFF;text-decoration:none;">Szabfun</a>!<br>
             We’re excited to have you as part of our fun community.
           </p>

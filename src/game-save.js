@@ -1,11 +1,17 @@
 const sqlite3 = require("sqlite3").verbose();
-const dbPath = "./dbs/data.db";
+const path = require("path");
+const fs = require("fs");
 
-const data = new sqlite3.Database(dbPath, (err) => {
+const dbsDir = path.join(__dirname, "..", "dbs");
+if (!fs.existsSync(dbsDir)) {
+  fs.mkdirSync(dbsDir, { recursive: true });
+}
+
+const data = new sqlite3.Database(path.join(dbsDir, "data.db"), (err) => {
   if (err) {
     console.error("Error opening game data database:", err.message);
   } else {
-    console.log("Connected to SQLite database. (users)");
+    console.log("Connected to SQLite database. (game-save)");
   }
 });
 

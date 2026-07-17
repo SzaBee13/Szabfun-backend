@@ -1,10 +1,16 @@
 const sqlite3 = require("sqlite3").verbose();
-const dbPath = "./dbs/sus-link.db";
+const path = require("path");
+const fs = require("fs");
 const crypto = require("crypto");
+
+const dbsDir = path.join(__dirname, "..", "dbs");
+if (!fs.existsSync(dbsDir)) {
+  fs.mkdirSync(dbsDir, { recursive: true });
+}
 
 const PRIVATE_GENERATED_AUTHOR = "__private_generated__";
 
-const susLinkDb = new sqlite3.Database(dbPath, (err) => {
+const susLinkDb = new sqlite3.Database(path.join(dbsDir, "sus-link.db"), (err) => {
   if (err) {
     console.error("Error opening sus-link database:", err.message);
   } else {

@@ -1,4 +1,3 @@
-const sqlite3 = require("sqlite3").verbose();
 const dotenv = require("dotenv");
 dotenv.config();
 
@@ -9,7 +8,8 @@ function isOwner(id, callback) {
 }
 
 function addAdmin(type, body, callback) {
-  const { admins } = require("./admin.js")
+  const { admins } = require("./admin.js");
+  const { users } = require("./users.js");
 
   if (type === "id") {
     const { adminGoogleId } = body;
@@ -31,7 +31,6 @@ function addAdmin(type, body, callback) {
     if (!adminEmail) {
       return callback({ status: 400, message: "Missing adminEmail" });
     }
-    // Find user by email
     users.get(
       "SELECT id FROM users WHERE email = ?",
       [adminEmail],
@@ -61,7 +60,7 @@ function addAdmin(type, body, callback) {
 }
 
 function removeAdmin(adminGoogleId, callback) {
-  const { admins } = require("./admin.js")
+  const { admins } = require("./admin.js");
 
   if (!adminGoogleId) {
     return callback({ status: 400, message: "Missing adminGoogleId" });
@@ -83,4 +82,4 @@ module.exports = {
   isOwner,
   addAdmin,
   removeAdmin,
-}
+};
