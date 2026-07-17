@@ -8,6 +8,7 @@ RUN addgroup -S app && adduser -S app -G app
 WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY src/ ./src/
+RUN mkdir -p /app/dbs && chown -R app:app /app
 USER app
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://localhost:3000/status || exit 1
