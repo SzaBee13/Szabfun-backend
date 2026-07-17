@@ -1,5 +1,11 @@
-/node_modules
-/package-lock.json
-/.env
-/dbs
+# Node
+node_modules/
+package-lock.json
+
+# Environment
+.env*  # All environment files like .env, .env.local, .env.production
+!.env.example
+
+# Database
+dbs/
 *.db

@@ -28,6 +28,7 @@ const {
 } = require("./sus-link.js");
 const { createBoard, isValidMove, checkWinner } = require("./tic-tac-toe.js");
 const { setupChaosClicker } = require("./chaos-clicker.js");
+const { setupChat } = require("./chat.js");
 
 const allowedOrigins = [
   "https://fun.szabee.me", 
@@ -424,6 +425,9 @@ ticTacToeIo.on("connection", (socket) => {
 
 // Chaos Clicker
 setupChaosClicker(server);
+
+// Chat
+setupChat(server);
 
 server.listen(port, () => {
   console.log(`Server with Socket.IO running at http://localhost:${port}`);

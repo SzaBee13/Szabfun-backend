@@ -1,2 +1,14 @@
+# Node
 node_modules
-npm-debug.log
+package-lock.json
+
+# Logs
+*.log
+
+# Git
+.git
+.gitignore
+
+# Misc
+README.md
+.env.example
